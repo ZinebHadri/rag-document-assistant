@@ -1,0 +1,17 @@
+services:
+  rag-assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: rag-document-assistant
+
+    ports:
+      - "8501:8501"
+      - "8000:8000"
+
+    volumes:
+      - ./data:/app/data
+      - ./storage:/app/storage
+
+    restart: unless-stopped

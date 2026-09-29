@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# RAG local data
+storage/chunks.json
+storage/faiss_index.bin
+data/*.pdf
+
+# Cache
+.cache/
+huggingface/
+transformers_cache/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment variables
+.env

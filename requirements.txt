@@ -1,0 +1,14 @@
+streamlit
+fastapi
+uvicorn
+requests
+python-multipart
+pypdf
+nltk
+sentence-transformers
+transformers
+torch
+faiss-cpu
+numpy
+rank-bm25
+pytest
