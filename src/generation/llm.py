@@ -1,65 +1,69 @@
 from functools import lru_cache
 
-
-MODEL_NAME = (
-    "Qwen/Qwen2.5-0.5B-Instruct"
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
 )
 
 
+MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
+
+
 @lru_cache(maxsize=1)
-def get_generator():
+def get_llm():
     """
-    Load and cache the local generation model.
+    Load tokenizer and Qwen model only once.
     """
 
-    from transformers import (
-        pipeline
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_NAME
     )
 
-    return pipeline(
-        "text-generation",
-        model=MODEL_NAME,
-        device=-1
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME
     )
+
+    return tokenizer, model
 
 
 def build_context(
-    retrieved_results,
-    max_sources=3
+    results,
+    max_chunks=3,
 ):
     """
-    Build the context sent to the LLM
-    using the best retrieved chunks.
+    Build the RAG context from the
+    top retrieved chunks.
     """
 
-    parts = []
+    context_parts = []
 
-    for result in (
-        retrieved_results[
-            :max_sources
-        ]
-    ):
+    for result in results[:max_chunks]:
 
-        chunk = result[
-            "chunk"
-        ]
+        chunk = result.get(
+            "chunk",
+            {},
+        )
+
+        text = (
+            chunk.get("text")
+            or chunk.get("content")
+            or ""
+        )
 
         source = chunk.get(
             "source",
-            "Unknown"
+            "unknown",
         )
 
         page = chunk.get(
             "page",
-            "Unknown"
+            "unknown",
         )
 
-        text = chunk.get(
-            "text",
-            ""
-        )
+        if not text:
+            continue
 
-        parts.append(
+        context_parts.append(
             f"""
 Source: {source}
 Page: {page}
@@ -68,73 +72,100 @@ Page: {page}
 """.strip()
         )
 
-    return "\n\n".join(
-        parts
+    return "\n\n---\n\n".join(
+        context_parts
     )
 
 
 def generate_answer(
-    question,
-    retrieved_results
-):
+    question: str,
+    results: list,
+) -> str:
     """
-    Generate a grounded answer
-    using only retrieved context.
+    Generate a grounded answer using
+    only retrieved context.
     """
 
-    if not retrieved_results:
-
+    if not results:
         return (
-            "I cannot find enough information "
-            "in the provided documents."
+            "I don't have enough relevant "
+            "information in the current "
+            "knowledge base to answer "
+            "this question reliably."
         )
 
     context = build_context(
-        retrieved_results,
-        max_sources=3
+        results
     )
 
-    prompt = f"""
-Answer the question using ONLY the context below.
+    if not context:
+        return (
+            "I don't have enough relevant "
+            "information in the current "
+            "knowledge base to answer "
+            "this question reliably."
+        )
 
-Rules:
-- Use only the provided context.
-- Do not invent information.
-- Give a concise answer in 2 complete sentences.
-- Do not stop in the middle of a sentence.
-- If the answer is not in the context, say:
-  "I cannot find enough information in the provided documents."
+    tokenizer, model = get_llm()
 
+    system_message = (
+        "You are a document question-answering assistant. "
+        "Answer only using the provided context. "
+        "Do not use outside knowledge. "
+        "If the context does not contain enough information, "
+        "say that you do not have enough information."
+    )
+
+    user_message = f"""
 Context:
+
 {context}
 
 Question:
+
 {question}
 
-Answer:
+Give a clear and concise answer in 2 to 4 complete sentences.
 """.strip()
 
-    generator = get_generator()
+    messages = [
+        {
+            "role": "system",
+            "content": system_message,
+        },
+        {
+            "role": "user",
+            "content": user_message,
+        },
+    ]
 
-    result = generator(
+    prompt = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+
+    inputs = tokenizer(
         prompt,
-        max_new_tokens=128,
+        return_tensors="pt",
+    )
+
+    output_ids = model.generate(
+        **inputs,
+        max_new_tokens=180,
         do_sample=False,
-        return_full_text=False
+        pad_token_id=tokenizer.eos_token_id,
     )
 
-    answer = (
-        result[0][
-            "generated_text"
-        ]
-        .strip()
+    generated_ids = output_ids[
+        0,
+        inputs["input_ids"].shape[1]:
+    ]
+
+    answer = tokenizer.decode(
+        generated_ids,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
     )
 
-    if not answer:
-
-        return (
-            "I cannot find enough information "
-            "in the provided documents."
-        )
-
-    return answer
+    return answer.strip()

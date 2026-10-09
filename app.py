@@ -1,21 +1,19 @@
 import streamlit as st
 import requests
+
 from urllib.parse import quote
 
 
-# CONFIG
-
 API_BASE_URL = "http://127.0.0.1:8000"
 
+
 st.set_page_config(
-    page_title="RAG Workspace",
+    page_title="Agentic RAG Workspace",
     page_icon="🧠",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-
-# STYLE
 
 st.markdown(
     """
@@ -134,24 +132,19 @@ st.markdown(
 
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
-
-# SESSION
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
-# API HELPERS
-
 def get_api_health():
-
     try:
         response = requests.get(
             f"{API_BASE_URL}/health",
-            timeout=5
+            timeout=5,
         )
 
         if response.status_code == 200:
@@ -164,17 +157,16 @@ def get_api_health():
 
 
 def get_documents():
-
     try:
         response = requests.get(
             f"{API_BASE_URL}/documents",
-            timeout=5
+            timeout=5,
         )
 
         if response.status_code == 200:
             return response.json().get(
                 "documents",
-                []
+                [],
             )
 
     except requests.RequestException:
@@ -184,11 +176,10 @@ def get_documents():
 
 
 def get_error_message(response):
-
     try:
         return response.json().get(
             "detail",
-            "Request failed."
+            "Request failed.",
         )
 
     except Exception:
@@ -197,8 +188,6 @@ def get_error_message(response):
             f"({response.status_code})."
         )
 
-
-# DATA
 
 api_online, health_data = get_api_health()
 
@@ -210,25 +199,27 @@ documents = (
 
 document_count = health_data.get(
     "documents",
-    0
+    0,
 )
 
 chunk_count = health_data.get(
     "chunks",
-    0
+    0,
+)
+
+rag_mode = health_data.get(
+    "rag_mode",
+    "unknown",
 )
 
 
-# SIDEBAR
-
 with st.sidebar:
-
     st.markdown(
-        "# 🧠✨ RAG Workspace"
+        "# 🧠✨ Agentic RAG"
     )
 
     st.caption(
-        "Document Intelligence"
+        "Document Intelligence Workspace"
     )
 
     st.write("")
@@ -243,9 +234,9 @@ with st.sidebar:
             "🏠 Home",
             "📚 Knowledge Base",
             "💬 Assistant",
-            "⚙️ How it works"
+            "⚙️ How it works",
         ],
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
 
     st.write("")
@@ -255,13 +246,10 @@ with st.sidebar:
     )
 
     if api_online:
-
         st.success(
             "● API online"
         )
-
     else:
-
         st.error(
             "● API offline"
         )
@@ -271,56 +259,60 @@ with st.sidebar:
     metric1, metric2 = st.columns(2)
 
     with metric1:
-
         st.metric(
             "Docs",
-            document_count
+            document_count,
         )
 
     with metric2:
-
         st.metric(
             "Chunks",
-            chunk_count
+            chunk_count,
+        )
+
+    if api_online:
+        st.caption(
+            f"Mode: {rag_mode}"
         )
 
 
-# HOME
-
 if page == "🏠 Home":
-
     st.title(
-        "Welcome to RAG Workspace"
+        "Agentic RAG Workspace"
     )
 
     st.write(
-        "Upload documents, build a searchable knowledge base "
-        "and ask grounded questions using hybrid retrieval."
+        "Upload documents, build a searchable "
+        "knowledge base and ask grounded questions "
+        "using an Agentic RAG workflow."
     )
 
     st.write("")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-
         st.metric(
-            "📄 Documents indexed",
-            document_count
+            "📄 Documents",
+            document_count,
         )
 
     with col2:
-
         st.metric(
             "🧱 Text chunks",
-            chunk_count
+            chunk_count,
         )
 
     with col3:
-
         st.metric(
             "🔎 Retrieval",
-            "FAISS + BM25"
+            "FAISS + BM25",
+        )
+
+    with col4:
+        st.metric(
+            "🧠 Orchestration",
+            "LangGraph",
         )
 
     st.write("")
@@ -330,37 +322,33 @@ if page == "🏠 Home":
     )
 
     if api_online:
-
         st.success(
             "FastAPI backend is connected and ready."
         )
 
     else:
-
         st.error(
             "FastAPI backend is offline."
         )
 
         st.code(
             "python -m uvicorn api:app --reload",
-            language="powershell"
+            language="powershell",
         )
 
     st.write("")
 
     st.subheader(
-        "Get started"
+        "What this system can do"
     )
 
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-
         with st.container(
             border=True,
-            height=185
+            height=190,
         ):
-
             st.markdown(
                 "### 📤"
             )
@@ -370,133 +358,121 @@ if page == "🏠 Home":
             )
 
             st.caption(
-                "Add PDF files to your knowledge base."
+                "Add PDF files to the knowledge base."
             )
 
     with c2:
-
         with st.container(
             border=True,
-            height=185
+            height=190,
         ):
-
             st.markdown(
-                "### 🧱"
+                "### 🔎"
             )
 
             st.markdown(
-                "**Build your knowledge base**"
+                "**Hybrid retrieval**"
             )
 
             st.caption(
-                "Documents are chunked and indexed automatically."
+                "Combine semantic FAISS search "
+                "with BM25 lexical search."
             )
 
     with c3:
-
         with st.container(
             border=True,
-            height=185
+            height=190,
         ):
-
             st.markdown(
-                "### 💬"
+                "### 🧠"
             )
 
             st.markdown(
-                "**Ask questions**"
+                "**Agentic decisions**"
             )
 
             st.caption(
-                "Get grounded answers from your documents."
+                "Grade retrieval quality and "
+                "rewrite weak queries."
             )
 
     with c4:
-
         with st.container(
             border=True,
-            height=185
+            height=190,
         ):
-
             st.markdown(
-                "### 📊"
+                "### 🛡️"
             )
 
             st.markdown(
-                "**Explore the pipeline**"
+                "**Safe fallback**"
             )
 
             st.caption(
-                "See how the RAG system works step by step."
+                "Avoid unsupported answers when "
+                "documents lack the information."
             )
 
 
-# KNOWLEDGE BASE
-
 elif page == "📚 Knowledge Base":
-
     st.title(
         "Knowledge Base"
     )
 
     st.write(
-        "Upload and manage the documents used by your RAG system."
+        "Upload and manage the documents "
+        "used by your Agentic RAG system."
     )
 
     st.write("")
 
     if not api_online:
-
         st.error(
             "FastAPI is offline. Start the backend first."
         )
 
     upload_col, stats_col = st.columns(
         [2, 1],
-        gap="large"
+        gap="large",
     )
 
     with upload_col:
-
         st.subheader(
             "Upload knowledge"
         )
 
         uploaded_file = st.file_uploader(
             "Upload a PDF",
-            type=["pdf"]
+            type=["pdf"],
         )
 
         if uploaded_file is not None:
-
             if st.button(
                 "📤 Add document",
                 use_container_width=True,
-                disabled=not api_online
+                disabled=not api_online,
             ):
-
                 files = {
                     "file": (
                         uploaded_file.name,
                         uploaded_file.getvalue(),
-                        "application/pdf"
+                        "application/pdf",
                     )
                 }
 
                 try:
-
                     with st.spinner(
                         "Reading, chunking and indexing document..."
                     ):
-
                         response = requests.post(
                             f"{API_BASE_URL}/upload",
                             files=files,
-                            timeout=600
+                            timeout=600,
                         )
 
                     if response.status_code == 200:
-
                         st.success(
                             f"{uploaded_file.name} indexed successfully."
                         )
@@ -504,7 +480,6 @@ elif page == "📚 Knowledge Base":
                         st.rerun()
 
                     else:
-
                         st.error(
                             get_error_message(
                                 response
@@ -512,31 +487,33 @@ elif page == "📚 Knowledge Base":
                         )
 
                 except requests.Timeout:
-
                     st.error(
                         "The upload took too long."
                     )
 
                 except requests.RequestException as error:
-
                     st.error(
                         f"Could not connect to API: {error}"
                     )
 
     with stats_col:
-
         st.subheader(
             "Index"
         )
 
         st.metric(
             "Documents",
-            document_count
+            document_count,
         )
 
         st.metric(
             "Chunks",
-            chunk_count
+            chunk_count,
+        )
+
+        st.metric(
+            "Search",
+            "Hybrid",
         )
 
     st.write("")
@@ -546,25 +523,20 @@ elif page == "📚 Knowledge Base":
     )
 
     if not documents:
-
         st.info(
             "No documents indexed yet."
         )
 
     else:
-
         for document in documents:
-
             with st.container(
                 border=True
             ):
-
                 doc_col1, doc_col2 = st.columns(
                     [4, 1]
                 )
 
                 with doc_col1:
-
                     st.markdown(
                         f"### 📄 {document['name']}"
                     )
@@ -574,7 +546,6 @@ elif page == "📚 Knowledge Base":
                     )
 
                 with doc_col2:
-
                     st.success(
                         "Indexed"
                     )
@@ -586,27 +557,24 @@ elif page == "📚 Knowledge Base":
             [
                 document["name"]
                 for document in documents
-            ]
+            ],
         )
 
         if st.button(
             "🗑️ Remove selected document"
         ):
-
             safe_name = quote(
                 selected_document,
-                safe=""
+                safe="",
             )
 
             try:
-
                 response = requests.delete(
                     f"{API_BASE_URL}/documents/{safe_name}",
-                    timeout=600
+                    timeout=600,
                 )
 
                 if response.status_code == 200:
-
                     st.success(
                         "Document removed."
                     )
@@ -614,7 +582,6 @@ elif page == "📚 Knowledge Base":
                     st.rerun()
 
                 else:
-
                     st.error(
                         get_error_message(
                             response
@@ -622,7 +589,6 @@ elif page == "📚 Knowledge Base":
                     )
 
             except requests.RequestException as error:
-
                 st.error(
                     f"Could not connect to API: {error}"
                 )
@@ -630,25 +596,21 @@ elif page == "📚 Knowledge Base":
         with st.expander(
             "⚠️ Danger zone"
         ):
-
             confirm_clear = st.checkbox(
                 "I want to remove every indexed document."
             )
 
             if st.button(
                 "Clear knowledge base",
-                disabled=not confirm_clear
+                disabled=not confirm_clear,
             ):
-
                 try:
-
                     response = requests.delete(
                         f"{API_BASE_URL}/documents",
-                        timeout=600
+                        timeout=600,
                     )
 
                     if response.status_code == 200:
-
                         st.session_state.messages = []
 
                         st.success(
@@ -658,7 +620,6 @@ elif page == "📚 Knowledge Base":
                         st.rerun()
 
                     else:
-
                         st.error(
                             get_error_message(
                                 response
@@ -666,83 +627,141 @@ elif page == "📚 Knowledge Base":
                         )
 
                 except requests.RequestException as error:
-
                     st.error(
                         f"Could not connect to API: {error}"
                     )
 
 
-# ASSISTANT
-
 elif page == "💬 Assistant":
-
     st.title(
-        "AI Assistant"
+        "Agentic AI Assistant"
     )
 
     st.write(
-        "Ask questions about the documents stored in your knowledge base."
+        "Ask questions about your documents. "
+        "The agent can evaluate retrieval quality, "
+        "rewrite weak searches and avoid answering "
+        "when the knowledge base is insufficient."
     )
 
     st.write("")
 
     if not api_online:
-
         st.error(
             "FastAPI is offline."
         )
 
         st.code(
             "python -m uvicorn api:app --reload",
-            language="powershell"
+            language="powershell",
         )
 
     elif document_count == 0:
-
         st.info(
-            "Upload at least one PDF in the Knowledge Base first."
+            "Upload at least one PDF "
+            "in the Knowledge Base first."
         )
 
     else:
-
         if not st.session_state.messages:
-
             with st.chat_message(
                 "assistant"
             ):
-
                 st.write(
-                    "Hello! I'm ready to answer questions "
-                    "about your indexed documents."
+                    "Hello! I'm ready to answer "
+                    "questions about your indexed "
+                    "documents using Agentic RAG."
                 )
 
         for message in st.session_state.messages:
-
             with st.chat_message(
                 message["role"]
             ):
-
                 st.write(
                     message["content"]
                 )
 
+                agent = message.get(
+                    "agent"
+                )
+
+                if (
+                    message["role"] == "assistant"
+                    and agent
+                ):
+                    with st.expander(
+                        "🧠 Agent trace",
+                        expanded=False,
+                    ):
+                        a1, a2, a3 = st.columns(3)
+
+                        with a1:
+                            st.metric(
+                                "Retrieval attempts",
+                                agent.get(
+                                    "retrieval_attempts",
+                                    0,
+                                ),
+                            )
+
+                        with a2:
+                            relevant = agent.get(
+                                "retrieval_relevant",
+                                False,
+                            )
+
+                            st.metric(
+                                "Context relevant",
+                                (
+                                    "Yes"
+                                    if relevant
+                                    else "No"
+                                ),
+                            )
+
+                        with a3:
+                            st.metric(
+                                "Mode",
+                                "Agentic RAG",
+                            )
+
+                        final_query = agent.get(
+                            "final_query"
+                        )
+
+                        if final_query:
+                            st.caption(
+                                "Final retrieval query"
+                            )
+
+                            st.code(
+                                final_query,
+                                language="text",
+                            )
+
+                        best_score = message.get(
+                            "best_similarity_score"
+                        )
+
+                        if best_score is not None:
+                            st.metric(
+                                "Best semantic similarity",
+                                best_score,
+                            )
+
                 sources = message.get(
                     "sources",
-                    []
+                    [],
                 )
 
                 if sources:
-
                     with st.expander(
                         f"📚 Sources ({len(sources)})"
                     ):
-
                         for source in sources:
-
                             with st.container(
                                 border=True
                             ):
-
                                 st.markdown(
                                     f"**📄 {source['document']}**"
                                 )
@@ -756,33 +775,30 @@ elif page == "💬 Assistant":
                                 )
 
                                 with score1:
-
                                     st.metric(
                                         "Semantic",
                                         source.get(
                                             "semantic_score",
-                                            0
-                                        )
+                                            0,
+                                        ),
                                     )
 
                                 with score2:
-
                                     st.metric(
                                         "BM25",
                                         source.get(
                                             "keyword_score",
-                                            0
-                                        )
+                                            0,
+                                        ),
                                     )
 
                                 with score3:
-
                                     st.metric(
                                         "Hybrid",
                                         source.get(
                                             "hybrid_score",
-                                            0
-                                        )
+                                            0,
+                                        ),
                                     )
 
         question = st.chat_input(
@@ -790,52 +806,59 @@ elif page == "💬 Assistant":
         )
 
         if question:
-
             st.session_state.messages.append(
                 {
                     "role": "user",
-                    "content": question
+                    "content": question,
                 }
             )
 
             try:
-
                 with st.spinner(
-                    "Searching your knowledge base..."
+                    "Agent is analyzing, retrieving and validating..."
                 ):
-
                     response = requests.post(
                         f"{API_BASE_URL}/ask",
                         json={
                             "question": question
                         },
-                        timeout=600
+                        timeout=600,
                     )
 
                 if response.status_code == 200:
-
                     data = response.json()
 
                     answer = data.get(
                         "answer",
-                        "No answer returned."
+                        "No answer returned.",
                     )
 
                     sources = data.get(
                         "sources",
-                        []
+                        [],
+                    )
+
+                    agent = data.get(
+                        "agent",
+                        {},
+                    )
+
+                    best_similarity_score = data.get(
+                        "best_similarity_score"
                     )
 
                     st.session_state.messages.append(
                         {
                             "role": "assistant",
                             "content": answer,
-                            "sources": sources
+                            "sources": sources,
+                            "agent": agent,
+                            "best_similarity_score":
+                                best_similarity_score,
                         }
                     )
 
                 else:
-
                     st.session_state.messages.append(
                         {
                             "role": "assistant",
@@ -845,204 +868,248 @@ elif page == "💬 Assistant":
                                     response
                                 )
                             ),
-                            "sources": []
+                            "sources": [],
+                            "agent": {},
                         }
                     )
 
             except requests.Timeout:
-
                 st.session_state.messages.append(
                     {
                         "role": "assistant",
                         "content": (
                             "The answer took too long to generate."
                         ),
-                        "sources": []
+                        "sources": [],
+                        "agent": {},
                     }
                 )
 
             except requests.RequestException as error:
-
                 st.session_state.messages.append(
                     {
                         "role": "assistant",
                         "content": (
                             f"Could not connect to API: {error}"
                         ),
-                        "sources": []
+                        "sources": [],
+                        "agent": {},
                     }
                 )
 
             st.rerun()
 
         if st.session_state.messages:
-
             st.write("")
 
             if st.button(
                 "🗑️ Clear conversation"
             ):
-
                 st.session_state.messages = []
 
                 st.rerun()
 
 
-# HOW IT WORKS
-
 elif page == "⚙️ How it works":
-
     st.title(
-        "How it works"
+        "How Agentic RAG works"
     )
 
     st.write(
-        "The main steps behind the Retrieval-Augmented Generation pipeline."
+        "The system combines document processing, "
+        "hybrid retrieval and an agentic decision "
+        "workflow orchestrated with LangGraph."
     )
 
     st.write("")
 
     st.subheader(
-        "Document processing"
+        "1. Document processing"
     )
 
     c1, c2, c3 = st.columns(3)
 
     with c1:
-
         with st.container(
             border=True,
-            height=180
+            height=180,
         ):
-
             st.markdown(
-                "### 1. 📄 PDF Upload"
+                "### 📄 PDF Upload"
             )
 
             st.caption(
-                "Documents are added to the knowledge base."
+                "Documents are added "
+                "to the knowledge base."
             )
 
     with c2:
-
         with st.container(
             border=True,
-            height=180
+            height=180,
         ):
-
             st.markdown(
-                "### 2. ✂️ Chunking"
+                "### ✂️ Chunking"
             )
 
             st.caption(
-                "Text is split into smaller passages."
+                "Text is split into "
+                "smaller passages."
             )
 
     with c3:
-
         with st.container(
             border=True,
-            height=180
+            height=180,
         ):
-
             st.markdown(
-                "### 3. 🧠 Embeddings"
+                "### 🧠 Embeddings"
             )
 
             st.caption(
-                "Chunks are transformed into vector representations."
+                "Chunks are transformed into "
+                "vector representations using "
+                "sentence embeddings."
             )
 
     st.write("")
 
     st.subheader(
-        "Retrieval"
+        "2. Hybrid retrieval"
     )
 
     c4, c5, c6 = st.columns(3)
 
     with c4:
-
         with st.container(
             border=True,
-            height=180
+            height=180,
         ):
-
             st.markdown(
-                "### 4. 🔎 FAISS"
+                "### 🔎 FAISS"
             )
 
             st.caption(
-                "Semantic search finds passages similar to the question."
+                "Semantic search finds passages "
+                "similar in meaning to the query."
             )
 
     with c5:
-
         with st.container(
             border=True,
-            height=180
+            height=180,
         ):
-
             st.markdown(
-                "### 5. 📚 BM25"
+                "### 📚 BM25"
             )
 
             st.caption(
-                "Lexical search finds passages with matching terms."
+                "Lexical search identifies "
+                "passages sharing important terms."
             )
 
     with c6:
-
         with st.container(
             border=True,
-            height=180
+            height=180,
         ):
-
             st.markdown(
-                "### 6. ⚡ Hybrid Retrieval"
+                "### ⚡ Hybrid Search"
             )
 
             st.caption(
-                "FAISS and BM25 results are combined."
+                "Semantic and lexical signals "
+                "are combined to rank candidates."
             )
 
     st.write("")
 
     st.subheader(
-        "Generation"
+        "3. Agentic decision layer"
     )
 
-    c7, c8 = st.columns(2)
+    c7, c8, c9 = st.columns(3)
 
     with c7:
-
         with st.container(
             border=True,
-            height=175
+            height=190,
         ):
-
             st.markdown(
-                "### 7. 📦 Context"
+                "### ✅ Relevance Grader"
             )
 
             st.caption(
-                "The most relevant passages are selected "
-                "and sent to the language model."
+                "Semantic thresholds and Qwen "
+                "determine whether retrieved "
+                "context is usable."
             )
 
     with c8:
-
         with st.container(
             border=True,
-            height=175
+            height=190,
         ):
-
             st.markdown(
-                "### 8. 🤖 Qwen"
+                "### 🔄 Query Rewriter"
             )
 
             st.caption(
-                "Qwen generates an answer using the retrieved context."
+                "If retrieval is weak, Qwen "
+                "creates an improved search query "
+                "and the system searches again."
+            )
+
+    with c9:
+        with st.container(
+            border=True,
+            height=190,
+        ):
+            st.markdown(
+                "### 🛡️ Safe Fallback"
+            )
+
+            st.caption(
+                "After repeated weak retrieval, "
+                "the system refuses to invent "
+                "unsupported information."
+            )
+
+    st.write("")
+
+    st.subheader(
+        "4. Grounded generation"
+    )
+
+    c10, c11 = st.columns(2)
+
+    with c10:
+        with st.container(
+            border=True,
+            height=180,
+        ):
+            st.markdown(
+                "### 📦 Context"
+            )
+
+            st.caption(
+                "Only relevant retrieved "
+                "passages are passed to "
+                "the generator."
+            )
+
+    with c11:
+        with st.container(
+            border=True,
+            height=180,
+        ):
+            st.markdown(
+                "### 🤖 Qwen"
+            )
+
+            st.caption(
+                "A local Qwen model generates "
+                "the final grounded answer."
             )
 
     st.write("")
@@ -1054,22 +1121,94 @@ elif page == "⚙️ How it works":
     st.code(
         """
 Streamlit Frontend
-        ↓
+        |
+        v
 FastAPI Backend
-        ↓
-PDF Processing
-        ↓
-Chunking
-        ↓
-Embeddings
-        ↓
-FAISS + BM25
-        ↓
+        |
+        v
+LangGraph Agent
+        |
+        v
+Analyze Query
+        |
+        v
 Hybrid Retrieval
-        ↓
-Qwen
-        ↓
-Answer + Sources
+   FAISS + BM25
+        |
+        v
+Relevance Grader
+        |
+        +---------------------------+
+        |                           |
+        | relevant                  | not relevant
+        v                           v
+Generate Answer              Query Rewriter
+        |                           |
+        |                           v
+        |                    Retrieve Again
+        |                           |
+        |                           v
+        |                     Grade Again
+        |                           |
+        |                  +--------+--------+
+        |                  |                 |
+        |               relevant         not relevant
+        |                  |                 |
+        v                  v                 v
+     Answer             Answer          Safe Fallback
+        |
+        v
+Answer + Sources + Agent Trace
         """,
-        language="text"
+        language="text",
+    )
+
+    st.write("")
+
+    st.subheader(
+        "Why Agentic RAG?"
+    )
+
+    st.write(
+        "A traditional RAG pipeline normally performs "
+        "retrieval once and immediately generates an answer. "
+        "This system adds a decision layer that evaluates "
+        "whether retrieval is trustworthy before allowing "
+        "generation."
+    )
+
+    st.code(
+        """
+Traditional RAG:
+
+Question
+   |
+   v
+Retrieve
+   |
+   v
+Generate
+
+
+Agentic RAG:
+
+Question
+   |
+   v
+Retrieve
+   |
+   v
+Evaluate
+   |
+   +---- good context ----> Generate
+   |
+   +---- weak context ----> Rewrite
+                              |
+                              v
+                           Retrieve again
+                              |
+                              v
+                           Evaluate
+        """,
+        language="text",
     )

@@ -2,14 +2,14 @@ from fastapi import (
     FastAPI,
     HTTPException,
     UploadFile,
-    File
+    File,
 )
 
 from pydantic import BaseModel
 
 
 from src.ingestion import (
-    process_pdf_bytes
+    process_pdf_bytes,
 )
 
 from src.storage import (
@@ -18,62 +18,52 @@ from src.storage import (
     get_document_names,
     remove_document,
     clear_chunks,
-    FAISS_PATH
+    FAISS_PATH,
 )
 
 from src.retrieval import (
     create_faiss_index,
-    load_or_rebuild_index,
-    retrieve_chunks
 )
 
-from src.generation import (
-    generate_answer
+from src.agentic import (
+    run_agentic_rag,
 )
 
 
-# ============================================================
-# FASTAPI APP
-# ============================================================
 
 app = FastAPI(
-    title="RAG Document Assistant API",
+    title="Agentic RAG Document Assistant API",
     description=(
         "REST API for uploading PDF documents "
-        "and asking questions using a "
-        "Retrieval-Augmented Generation pipeline."
+        "and asking questions using an Agentic "
+        "Retrieval-Augmented Generation pipeline "
+        "with hybrid retrieval, relevance grading, "
+        "query rewriting and safe fallback."
     ),
-    version="1.0.0"
+    version="2.0.0",
 )
 
 
-# ============================================================
-# REQUEST MODELS
-# ============================================================
 
 class QuestionRequest(
     BaseModel
 ):
-
     question: str
 
 
-# ============================================================
-# ROOT
-# ============================================================
+
 
 @app.get("/")
 def root():
 
     return {
         "message":
-            "RAG Document Assistant API is running"
+            "Agentic RAG Document Assistant API is running",
+        "version":
+            "2.0.0",
     }
 
 
-# ============================================================
-# HEALTH
-# ============================================================
 
 @app.get("/health")
 def health():
@@ -96,7 +86,10 @@ def health():
             len(documents),
 
         "chunks":
-            len(chunks)
+            len(chunks),
+
+        "rag_mode":
+            "agentic",
     }
 
 
@@ -119,9 +112,7 @@ def documents():
 
     result = []
 
-    for document_name in (
-        document_names
-    ):
+    for document_name in document_names:
 
         chunk_count = sum(
             1
@@ -138,7 +129,7 @@ def documents():
                     document_name,
 
                 "chunks":
-                    chunk_count
+                    chunk_count,
             }
         )
 
@@ -147,22 +138,15 @@ def documents():
             len(result),
 
         "documents":
-            result
+            result,
     }
 
 
-# ============================================================
-# UPLOAD PDF
-# ============================================================
-
 @app.post("/upload")
 async def upload_document(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
 ):
 
-    # --------------------------------------------------------
-    # VALIDATE FILE
-    # --------------------------------------------------------
 
     if not (
         file.filename
@@ -175,29 +159,20 @@ async def upload_document(
             detail=(
                 "Only PDF files "
                 "are supported."
-            )
+            ),
         )
 
-
-    # --------------------------------------------------------
-    # LOAD EXISTING CHUNKS
-    # --------------------------------------------------------
 
     chunks = (
         load_chunks()
     )
 
 
-    # --------------------------------------------------------
-    # CHECK DUPLICATE
-    # --------------------------------------------------------
-
     existing_document = any(
         chunk["source"]
         == file.filename
         for chunk in chunks
     )
-
 
     if existing_document:
 
@@ -206,25 +181,20 @@ async def upload_document(
             detail=(
                 "A document with this "
                 "filename already exists."
-            )
+            ),
         )
 
-
-    # --------------------------------------------------------
-    # READ PDF
-    # --------------------------------------------------------
 
     file_bytes = (
         await file.read()
     )
-
 
     try:
 
         new_chunks = (
             process_pdf_bytes(
                 file.filename,
-                file_bytes
+                file_bytes,
             )
         )
 
@@ -235,9 +205,8 @@ async def upload_document(
             detail=(
                 f"Could not process PDF: "
                 f"{str(error)}"
-            )
+            ),
         )
-
 
     if len(new_chunks) == 0:
 
@@ -246,13 +215,9 @@ async def upload_document(
             detail=(
                 "No readable text "
                 "was found in the PDF."
-            )
+            ),
         )
 
-
-    # --------------------------------------------------------
-    # SAVE CHUNKS
-    # --------------------------------------------------------
 
     chunks.extend(
         new_chunks
@@ -263,14 +228,9 @@ async def upload_document(
     )
 
 
-    # --------------------------------------------------------
-    # REBUILD FAISS
-    # --------------------------------------------------------
-
     create_faiss_index(
         chunks
     )
-
 
     return {
         "message":
@@ -283,19 +243,16 @@ async def upload_document(
             len(new_chunks),
 
         "total_chunks":
-            len(chunks)
+            len(chunks),
     }
 
 
-# ============================================================
-# DELETE ONE DOCUMENT
-# ============================================================
 
 @app.delete(
     "/documents/{document_name}"
 )
 def delete_document(
-    document_name: str
+    document_name: str,
 ):
 
     chunks = (
@@ -308,7 +265,6 @@ def delete_document(
         )
     )
 
-
     if (
         document_name
         not in document_names
@@ -318,22 +274,25 @@ def delete_document(
             status_code=404,
             detail=(
                 "Document not found."
-            )
+            ),
         )
-
 
     remaining_chunks = (
         remove_document(
             chunks,
-            document_name
+            document_name,
         )
     )
 
+    if remaining_chunks:
 
-    create_faiss_index(
-        remaining_chunks
-    )
+        create_faiss_index(
+            remaining_chunks
+        )
 
+    elif FAISS_PATH.exists():
+
+        FAISS_PATH.unlink()
 
     return {
         "message":
@@ -345,24 +304,19 @@ def delete_document(
         "remaining_chunks":
             len(
                 remaining_chunks
-            )
+            ),
     }
 
 
-# ============================================================
-# CLEAR KNOWLEDGE BASE
-# ============================================================
 
 @app.delete("/documents")
 def delete_all_documents():
 
     clear_chunks()
 
-
     if FAISS_PATH.exists():
 
         FAISS_PATH.unlink()
-
 
     return {
         "message":
@@ -371,12 +325,115 @@ def delete_all_documents():
 
 
 # ============================================================
-# ASK RAG
+# HELPER: BUILD SOURCES
 # ============================================================
+
+def build_sources(
+    retrieved_results,
+):
+    """
+    Convert retrieved chunks into a clean
+    source list for the API response.
+
+    Duplicate document/page combinations
+    are removed.
+    """
+
+    sources = []
+
+    seen_sources = set()
+
+    for result in retrieved_results:
+
+        chunk = result.get(
+            "chunk",
+            {},
+        )
+
+        document = chunk.get(
+            "source",
+            "unknown",
+        )
+
+        page = chunk.get(
+            "page",
+            "unknown",
+        )
+
+        key = (
+            document,
+            page,
+        )
+
+        if key in seen_sources:
+            continue
+
+        seen_sources.add(
+            key
+        )
+
+        semantic_score = (
+            result.get(
+                "semantic_score",
+                0.0,
+            )
+        )
+
+        keyword_score = (
+            result.get(
+                "keyword_score",
+                0.0,
+            )
+        )
+
+        hybrid_score = (
+            result.get(
+                "hybrid_score",
+                0.0,
+            )
+        )
+
+        sources.append(
+            {
+                "document":
+                    document,
+
+                "page":
+                    page,
+
+                "semantic_score":
+                    round(
+                        float(
+                            semantic_score
+                        ),
+                        3,
+                    ),
+
+                "keyword_score":
+                    round(
+                        float(
+                            keyword_score
+                        ),
+                        3,
+                    ),
+
+                "hybrid_score":
+                    round(
+                        float(
+                            hybrid_score
+                        ),
+                        3,
+                    ),
+            }
+        )
+
+    return sources
+
+
 
 @app.post("/ask")
 def ask_question(
-    request: QuestionRequest
+    request: QuestionRequest,
 ):
 
     question = (
@@ -385,10 +442,6 @@ def ask_question(
     )
 
 
-    # --------------------------------------------------------
-    # VALIDATION
-    # --------------------------------------------------------
-
     if not question:
 
         raise HTTPException(
@@ -396,18 +449,13 @@ def ask_question(
             detail=(
                 "Question cannot "
                 "be empty."
-            )
+            ),
         )
 
-
-    # --------------------------------------------------------
-    # LOAD KNOWLEDGE BASE
-    # --------------------------------------------------------
 
     chunks = (
         load_chunks()
     )
-
 
     if len(chunks) == 0:
 
@@ -416,179 +464,99 @@ def ask_question(
             detail=(
                 "Knowledge base is empty. "
                 "Upload documents first."
+            ),
+        )
+
+
+    try:
+
+        final_state = (
+            run_agentic_rag(
+                question
             )
         )
 
-
-    index = (
-        load_or_rebuild_index(
-            chunks
-        )
-    )
-
-
-    if index is None:
+    except Exception as error:
 
         raise HTTPException(
             status_code=500,
             detail=(
-                "Vector index could "
-                "not be loaded."
-            )
+                "Agentic RAG workflow failed: "
+                f"{str(error)}"
+            ),
         )
 
 
-    # --------------------------------------------------------
-    # RETRIEVAL
-    # --------------------------------------------------------
+    answer = final_state.get(
+        "answer",
+        "",
+    )
+
+    current_query = (
+        final_state.get(
+            "current_query",
+            question,
+        )
+    )
+
+    retrieval_attempts = (
+        final_state.get(
+            "retrieval_attempts",
+            0,
+        )
+    )
+
+    retrieval_is_relevant = (
+        final_state.get(
+            "retrieval_is_relevant",
+            False,
+        )
+    )
 
     retrieved_results = (
-        retrieve_chunks(
-            question,
-            chunks,
-            index,
-            top_k=10
+        final_state.get(
+            "retrieved_results",
+            [],
         )
     )
-
-
-    if len(
-        retrieved_results
-    ) == 0:
-
-        return {
-            "question":
-                question,
-
-            "answer":
-                (
-                    "I cannot find enough "
-                    "information in the "
-                    "provided documents."
-                ),
-
-            "sources":
-                []
-        }
-
-
-    # --------------------------------------------------------
-    # CONFIDENCE THRESHOLD
-    # --------------------------------------------------------
-
-    similarity_threshold = (
-        0.35
-    )
-
-    best_score = (
-        retrieved_results[0]
-        ["semantic_score"]
-    )
-
-
-    if (
-        best_score
-        <
-        similarity_threshold
-    ):
-
-        return {
-            "question":
-                question,
-
-            "answer":
-                (
-                    "I cannot find enough "
-                    "information in the "
-                    "provided documents."
-                ),
-
-            "best_similarity_score":
-                round(
-                    best_score,
-                    3
-                ),
-
-            "sources":
-                []
-        }
-
-
-    # --------------------------------------------------------
-    # GENERATION
-    # --------------------------------------------------------
-
-    answer = (
-        generate_answer(
-            question,
-            retrieved_results
-        )
-    )
-
 
     # --------------------------------------------------------
     # SOURCES
     # --------------------------------------------------------
 
-    sources = []
-
-    seen_sources = set()
-
-
-    for result in (
-        retrieved_results
-    ):
-
-        chunk = (
-            result["chunk"]
+    sources = (
+        build_sources(
+            retrieved_results
         )
+        if retrieval_is_relevant
+        else []
+    )
 
-        key = (
-            chunk["source"],
-            chunk["page"]
-        )
+    best_semantic_score = None
 
+    if retrieved_results:
 
-        if key in seen_sources:
-            continue
+        semantic_scores = [
+            float(
+                result.get(
+                    "semantic_score",
+                    0.0,
+                )
+            )
+            for result
+            in retrieved_results
+        ]
 
+        if semantic_scores:
 
-        seen_sources.add(
-            key
-        )
-
-
-        sources.append(
-            {
-                "document":
-                    chunk["source"],
-
-                "page":
-                    chunk["page"],
-
-                "semantic_score":
-                    round(
-                        result[
-                            "semantic_score"
-                        ],
-                        3
+            best_semantic_score = (
+                round(
+                    max(
+                        semantic_scores
                     ),
-
-                "keyword_score":
-                    result[
-                        "keyword_score"
-                    ],
-
-                "hybrid_score":
-                    round(
-                        result[
-                            "hybrid_score"
-                        ],
-                        3
-                    )
-            }
-        )
-
+                    3,
+                )
+            )
 
     # --------------------------------------------------------
     # RESPONSE
@@ -601,12 +569,24 @@ def ask_question(
         "answer":
             answer,
 
+        "agent":
+            {
+                "mode":
+                    "agentic_rag",
+
+                "final_query":
+                    current_query,
+
+                "retrieval_attempts":
+                    retrieval_attempts,
+
+                "retrieval_relevant":
+                    retrieval_is_relevant,
+            },
+
         "best_similarity_score":
-            round(
-                best_score,
-                3
-            ),
+            best_semantic_score,
 
         "sources":
-            sources
+            sources,
     }
